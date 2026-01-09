@@ -1,6 +1,6 @@
 (async function RatedSongExtension() {
     // 1. Wait for Spicetify Platform API to be ready
-    while (!Spicetify?.Platform?.RootlistAPI) {
+    while (!Spicetify?.Platform?.RootlistAPI || !Spicetify?.Platform?.LibraryAPI || !Spicetify?.Platform?.PlaylistAPI) {
         await new Promise(resolve => setTimeout(resolve, 100));
     }
     
@@ -18,6 +18,7 @@
         try {
             const rootAPI = Spicetify.Platform.RootlistAPI;
             let rootContent = await rootAPI.getContents();
+            if (!rootContent || !rootContent.items) return;
             
             // Define playlist names (10/10 down to 0.5/10)
             const playlistNames = [];
@@ -253,6 +254,36 @@
         checkCurrentSong();
     }
 
+    // Helper: Delete all extension playlists (Cleanup)
+    async function deletePlaylists() {
+        const rootAPI = Spicetify.Platform.RootlistAPI;
+        try {
+            const rootContent = await rootAPI.getContents();
+            const toRemove = [];
+            
+            // Generate expected names
+            const playlistNames = [];
+            for (let i = 20; i >= 1; i--) {
+                playlistNames.push(`${i/2}/10`);
+            }
+
+            for (const name of playlistNames) {
+                const matches = rootContent.items.filter(item => item.type === 'playlist' && item.name === name);
+                matches.forEach(m => toRemove.push(m.uri));
+            }
+
+            if (toRemove.length > 0) {
+                await rootAPI.remove(toRemove);
+                Spicetify.showNotification(`Deleted ${toRemove.length} playlists.`);
+            } else {
+                Spicetify.showNotification("No rating playlists found.");
+            }
+        } catch (e) {
+            console.error("Error deleting playlists:", e);
+            Spicetify.showNotification("Error deleting playlists");
+        }
+    }
+
     function showRatingModal(trackUri) {
         const modalContent = document.createElement("div");
         modalContent.className = "rated-song-modal-content";
@@ -301,6 +332,54 @@
         };
         modalContent.appendChild(clearBtn);
 
+        // Delete All Playlists Button
+        const deleteDataBtn = document.createElement("button");
+        deleteDataBtn.className = "rated-song-clear-btn";
+        deleteDataBtn.style.backgroundColor = "#333";
+        deleteDataBtn.innerText = "Delete All Playlists";
+        deleteDataBtn.onclick = () => {
+            const confirmContainer = document.createElement("div");
+            confirmContainer.className = "rated-song-modal-content";
+            
+            const warningText = document.createElement("p");
+            warningText.innerText = "Are you sure you want to delete all rating playlists?\nThis cannot be undone.";
+            warningText.style.textAlign = "center";
+            warningText.style.color = "var(--spice-text)";
+            warningText.style.fontSize = "14px";
+            
+            const btnRow = document.createElement("div");
+            btnRow.style.display = "flex";
+            btnRow.style.gap = "20px";
+            btnRow.style.justifyContent = "center";
+            btnRow.style.width = "100%";
+            
+            const noBtn = document.createElement("button");
+            noBtn.className = "rated-song-btn";
+            noBtn.innerText = "Cancel";
+            noBtn.style.padding = "10px 30px";
+            noBtn.style.backgroundColor = "#555";
+            noBtn.onclick = () => showRatingModal(trackUri);
+            
+            const yesBtn = document.createElement("button");
+            yesBtn.className = "rated-song-clear-btn";
+            yesBtn.innerText = "Yes, Delete";
+            yesBtn.style.marginTop = "0";
+            yesBtn.style.padding = "10px 30px";
+            yesBtn.onclick = async () => {
+                Spicetify.PopupModal.hide();
+                await deletePlaylists();
+            };
+            
+            btnRow.appendChild(noBtn);
+            btnRow.appendChild(yesBtn);
+            
+            confirmContainer.appendChild(warningText);
+            confirmContainer.appendChild(btnRow);
+            
+            Spicetify.PopupModal.display({ title: "Confirm Deletion", content: confirmContainer });
+        };
+        modalContent.appendChild(deleteDataBtn);
+
         Spicetify.PopupModal.display({ title: "Rate Song", content: modalContent, isLarge: true });
 
         // Highlight current rating
@@ -322,6 +401,10 @@
         const libraryAPI = Spicetify.Platform.LibraryAPI;
         const playlistAPI = Spicetify.Platform.PlaylistAPI;
         if (!libraryAPI) return;
+        if (!libraryAPI.getTracks) {
+            console.warn("[Rated Song] LibraryAPI.getTracks not available.");
+            return;
+        }
 
         validLikedUris.clear();
 
@@ -368,8 +451,11 @@
 
     // 2.6 Override LibraryAPI.add and remove to enforce rules
     function enforceLikedRule() {
+        if (!Spicetify.Platform.LibraryAPI) return;
         const originalAdd = Spicetify.Platform.LibraryAPI.add;
         const originalRemove = Spicetify.Platform.LibraryAPI.remove;
+
+        if (!originalAdd || !originalRemove) return;
 
         Spicetify.Platform.LibraryAPI.add = async function(data) {
             const uris = data.uris || [];
@@ -499,7 +585,9 @@
 
         // Topbar Button (Quick access to rate current song)
         if (Spicetify.Topbar) {
-            topbarBtnWidget = new Spicetify.Topbar.Button("Rate Song", "star", () => {
+            // SVG Icon for compatibility
+            const starIcon = `<svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16"><path d="M8 .19l2.47 5.01 5.53.8-4 3.9.94 5.51L8 12.8l-4.94 2.6.94-5.5-4-3.9 5.53-.8L8 .19z"></path></svg>`;
+            topbarBtnWidget = new Spicetify.Topbar.Button("Rate Song", starIcon, () => {
                 const track = Spicetify.Player.data?.item;
                 if (track) showRatingModal(track.uri);
             });

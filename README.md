@@ -47,12 +47,16 @@ Before installing this extension, you must have **Spicetify** installed on your 
 ## 📥 Installation
 
 1.  Download the files from the [GitHub Repository](https://github.com/scratchgamingone/spotify-rating-extension).
-2.  Ensure you have the following two files in the same folder:
+2.  Ensure you have the following files in the same folder:
     *   `rated_song.js` (The extension code)
     *   `install_rated_song.bat` (The installer)
+    *   `uninstall_rated_song.bat` (The uninstaller)
 3.  Double-click **`install_rated_song.bat`**.
 4.  A window will pop up showing the installation progress. Once it says **"Extension installed and applied!"**, Spotify will reload.
 5.  You are done!
+
+### Alternative: Install from GitHub
+If you have `install_from_github.bat`, you can simply run it to download and install the latest version directly from the repository without needing to manually download the `.js` file.
 
 ## 🚀 How to Use
 
@@ -65,6 +69,12 @@ Before installing this extension, you must have **Spicetify** installed on your 
 3.  **Clear a Rating:**
     *   Open the rating menu and click **"Clear Rating"**, or simply "Unlike" the song in Spotify.
 
+## 🗑️ Uninstalling
+
+1.  **Delete Playlists:** Open the rating menu (Ctrl+Alt+R) and click **"Delete All Playlists"**.
+    *   *Note: Do this BEFORE uninstalling, otherwise you will have to delete the playlists manually.*
+2.  **Remove Extension:** Double-click **`uninstall_rated_song.bat`**.
+
 ## ❓ Troubleshooting
 
 *   **Playlists didn't appear?** Restart Spotify. The extension needs a moment to create them on the first run.
@@ -73,3 +83,7 @@ Before installing this extension, you must have **Spicetify** installed on your 
 
 ---
 *Note: This extension requires the Spotify Desktop app and Spicetify CLI.*
+
+## 👨‍💻 For Developers
+
+*   **`upload_to_github.bat`**: A script to automatically commit and push changes to the repository.
