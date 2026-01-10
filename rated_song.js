@@ -11,6 +11,7 @@
     const ratingPlaylists = {};
     const validLikedUris = new Set();
     const ratedSongsCache = new Map();
+    const processingLowRatingUris = new Set();
     let topbarBtnWidget = null;
 
     // 2. Function to check and create rating playlists
@@ -39,12 +40,34 @@
 
             // 1.5 Remove duplicate playlists
             const duplicatesToDelete = [];
-            for (const name of playlistNames) {
-                const matches = rootContent.items.filter(item => item.type === 'playlist' && item.name === name);
-                if (matches.length > 1) {
-                    // Keep the first one, delete the rest
-                    for (let i = 1; i < matches.length; i++) {
-                        duplicatesToDelete.push(matches[i].uri);
+            const groups = {};
+            
+            // Group all playlists in root by name
+            for (const item of rootContent.items) {
+                if (item.type === 'playlist' && playlistNames.includes(item.name)) {
+                    if (!groups[item.name]) groups[item.name] = [];
+                    groups[item.name].push(item);
+                }
+            }
+
+            for (const name in groups) {
+                const items = groups[name];
+                if (items.length > 1) {
+                    const candidates = [];
+                    for (const m of items) {
+                        let count = 0;
+                        try {
+                            const c = await Spicetify.Platform.PlaylistAPI.getContents(m.uri);
+                            count = c.items ? c.items.length : 0;
+                        } catch (e) { count = -1; }
+                        candidates.push({ uri: m.uri, count });
+                    }
+                    // Sort descending by count
+                    candidates.sort((a, b) => b.count - a.count);
+                    
+                    // Keep the one with most songs (index 0), delete others
+                    for (let i = 1; i < candidates.length; i++) {
+                        duplicatesToDelete.push(candidates[i].uri);
                     }
                 }
             }
@@ -193,18 +216,28 @@
     // Helper: Apply rating to a song (Used by Modal and Hotkeys)
     async function rateSong(trackUri, ratingValue) {
         const name = `${ratingValue}/10`;
+        
+        // Helper to get fresh URI
+        const getFreshURI = async () => {
+            try {
+                const rootContent = await Spicetify.Platform.RootlistAPI.getContents();
+                let found = rootContent.items.find(item => item.type === 'playlist' && item.name === name);
+                if (!found) {
+                    await Spicetify.Platform.RootlistAPI.createPlaylist(name, { before: 'start' });
+                    await new Promise(r => setTimeout(r, 1000));
+                    const newRoot = await Spicetify.Platform.RootlistAPI.getContents();
+                    found = newRoot.items.find(item => item.type === 'playlist' && item.name === name);
+                }
+                return found ? found.uri : null;
+            } catch (e) { return null; }
+        };
+
         let playlistUri = ratingPlaylists[name];
 
         // Fallback: If URI is missing, try to find it in Root
         if (!playlistUri) {
-            try {
-                const rootContent = await Spicetify.Platform.RootlistAPI.getContents();
-                const found = rootContent.items.find(item => item.type === 'playlist' && item.name === name);
-                if (found) {
-                    playlistUri = found.uri;
-                    ratingPlaylists[name] = found.uri;
-                }
-            } catch (e) {}
+            playlistUri = await getFreshURI();
+            if (playlistUri) ratingPlaylists[name] = playlistUri;
         }
 
         if (!playlistUri) {
@@ -222,7 +255,15 @@
                     await Spicetify.Platform.PlaylistAPI.add(playlistUri, [trackUri], { before: 'start' });
                     break;
                 } catch (e) {
+                    console.warn(`[Rated Song] Add failed (Attempt ${attempt}):`, e);
                     if (attempt === 3) throw e;
+                    
+                    // Refresh URI on failure
+                    const fresh = await getFreshURI();
+                    if (fresh) {
+                        playlistUri = fresh;
+                        ratingPlaylists[name] = fresh;
+                    }
                     await new Promise(r => setTimeout(r, 500));
                 }
             }
@@ -236,9 +277,12 @@
                     await Spicetify.Platform.LibraryAPI.add({uris: [trackUri]});
                 } else {
                     validLikedUris.delete(trackUri);
+                    processingLowRatingUris.add(trackUri);
                     await Spicetify.Platform.LibraryAPI.remove({uris: [trackUri]});
+                    processingLowRatingUris.delete(trackUri);
                 }
             } catch (e) {
+                processingLowRatingUris.delete(trackUri);
                 console.error("[Rated Song] Auto-like/unlike failed:", e);
             }
 
@@ -283,6 +327,9 @@
             Spicetify.showNotification("Error deleting playlists");
         }
     }
+
+    // Expose for uninstaller
+    window.RatedSong_DeleteAll = deletePlaylists;
 
     function showRatingModal(trackUri) {
         const modalContent = document.createElement("div");
@@ -483,6 +530,8 @@
             // 2. If successful, also remove from rating playlists
             let anyRatingRemoved = false;
             for (const uri of uris) {
+                if (processingLowRatingUris.has(uri)) continue;
+
                 if (validLikedUris.has(uri)) validLikedUris.delete(uri);
                 const removed = await updateSongRating(uri);
                 if (removed) anyRatingRemoved = true;

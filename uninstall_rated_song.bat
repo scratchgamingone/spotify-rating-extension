@@ -2,6 +2,9 @@
 setlocal EnableDelayedExpansion
 
 set "EXTENSION_NAME=rated_song.js"
+set "REMOVER_NAME=rated_song_remover.js"
+set "SCRIPT_DIR=%~dp0"
+set "SOURCE_FILE=!SCRIPT_DIR!%EXTENSION_NAME%"
 
 echo ========================================================
 echo   Spicetify Extension Uninstaller: %EXTENSION_NAME%
@@ -32,12 +35,47 @@ if not exist "!SPICETIFY_DIR!" (
 
 set "EXTENSIONS_DIR=!SPICETIFY_DIR!\Extensions"
 set "TARGET_FILE=!EXTENSIONS_DIR!\%EXTENSION_NAME%"
+set "REMOVER_FILE=!EXTENSIONS_DIR!\%REMOVER_NAME%"
 
-echo [INFO] Removing extension from configuration...
-:: The minus sign at the end removes the extension from the config list
-call spicetify config extensions %EXTENSION_NAME%-
+echo [INFO] Preparing cleanup...
+:: Update the extension file to ensure it has the deletion logic
+if exist "!SOURCE_FILE!" (
+    copy /Y "!SOURCE_FILE!" "!EXTENSIONS_DIR!\" >nul
+)
+
+echo [INFO] Creating cleanup script...
+set "REMOVER_FILE_PATH=!REMOVER_FILE!"
+setlocal DisableDelayedExpansion
+(
+echo (async function^(^) {
+echo     while ^(!window.RatedSong_DeleteAll^) {
+echo         await new Promise^(r =^> setTimeout^(r, 100^)^);
+echo     }
+echo     await new Promise^(r =^> setTimeout^(r, 1000^)^);
+echo     await window.RatedSong_DeleteAll^(^);
+echo     alert^("All rated playlists have been deleted. You can now close Spotify to complete the uninstallation."^);
+echo }^)^(^);
+) > "%REMOVER_FILE_PATH%"
+endlocal
+
+echo [INFO] Enabling cleanup mode...
+call spicetify config extensions %EXTENSION_NAME% %REMOVER_NAME%
 
 echo [INFO] Applying changes to Spotify...
+call spicetify apply
+
+echo.
+echo ========================================================
+echo   ACTION REQUIRED
+echo ========================================================
+echo 1. Spotify should have restarted. If not, please OPEN Spotify now.
+echo 2. Wait for a popup saying "All rated playlists have been deleted".
+echo 3. Once you see that popup, press any key here to finish.
+echo ========================================================
+pause
+
+echo [INFO] Removing extensions from configuration...
+call spicetify config extensions %EXTENSION_NAME%- %REMOVER_NAME%-
 call spicetify apply
 
 if exist "!TARGET_FILE!" (
@@ -48,8 +86,8 @@ if exist "!TARGET_FILE!" (
     echo [INFO] Extension file not found in Extensions folder.
 )
 
+if exist "!REMOVER_FILE!" del /F /Q "!REMOVER_FILE!"
+
 echo.
 echo [SUCCESS] Uninstallation complete!
-echo Note: If you did not use the "Delete All Playlists" button in the extension menu,
-echo       the playlists will remain in your library and must be deleted manually.
 pause
