@@ -1,0 +1,15 @@
+
+{
+  "name": "Rated Song",
+  "description": "Rate songs from 0.5 to 10. Automatically creates playlists for each rating and syncs Liked Songs with top-rated tracks.",
+  "main": "rated_song.js",
+  "authors": [
+    {
+      "name": "scratchgamingone",
+      "url": "https://github.com/scratchgamingone"
+    }
+  ],
+  "preview": "preview.png",
+  "readme": "README.md",
+  "_comment": "Rated Song Extension. Inspired by: https://github.com/jeroentvb/spicetify-playlist-icons"
+}

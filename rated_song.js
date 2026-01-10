@@ -1,3 +1,8 @@
+/**
+ * Rated Song Extension
+ * Inspired by: https://github.com/jeroentvb/spicetify-playlist-icons
+ */
+
 (async function RatedSongExtension() {
     // 1. Wait for Spicetify Platform API to be ready
     while (!Spicetify?.Platform?.RootlistAPI || !Spicetify?.Platform?.LibraryAPI || !Spicetify?.Platform?.PlaylistAPI) {
