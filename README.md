@@ -90,4 +90,4 @@ If you have `install_from_github.bat`, you can simply run it to download and ins
 
 ## 👏 Credits
 
-*   Inspired by spicetify-playlist-icons.
+*   Inspired by [spicetify-playlist-icons](https://github.com/brimell/spicetify-star-ratings).
