@@ -16,8 +16,8 @@ This extension **takes control** of your "Liked Songs" library to keep it synced
 *   **Precision Rating:** Rate any song from 0.5/10 to 10/10.
 *   **Automatic Playlists:** The extension creates and manages 20 playlists for you (e.g., `10/10`, `9.5/10`, ... `0.5/10`).
 *   **Smart "Liked Songs" Sync:**
-    *   If you rate a song **5/10 or higher**, it is automatically **Liked** (added to Liked Songs).
-    *   If you rate a song **below 5/10**, it is automatically **Unliked**.
+    *   If you rate a song **above your threshold** (default 5/10), it is automatically **Liked**.
+    *   If you rate a song **below your threshold**, it is automatically **Unliked**.
     *   If you manually "Unlike" a song, its rating is removed.
 *   **Quick Access:**
     *   **Right-click** any song and select "Rate Song".
@@ -26,7 +26,8 @@ This extension **takes control** of your "Liked Songs" library to keep it synced
     *   **Instant Rate:** Press **Alt + 1** through **Alt + 9** to instantly rate the current song (e.g., `Alt+5` rates it 5/10).
 *   **Smart Features:**
     *   **Visual Indicator:** The top bar button updates to show the rating of the current song (e.g., `★ 8.5`).
-    *   **Auto-Skip:** Songs rated **1/10 or lower** are automatically skipped.
+    *   **Auto-Skip:** Songs rated **1/10 or lower** (configurable) are automatically skipped.
+    *   **Settings Menu:** Customize your thresholds for Auto-Like and Auto-Skip via the Profile Menu.
 
 ## 🛠️ Prerequisites
 

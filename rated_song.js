@@ -19,6 +19,19 @@
     const processingLowRatingUris = new Set();
     let topbarBtnWidget = null;
 
+    // Configuration
+    const CONFIG = {
+        likedThreshold: parseFloat(localStorage.getItem("rated_song_liked_threshold") || "5.0"),
+        skipThreshold: parseFloat(localStorage.getItem("rated_song_skip_threshold") || "1.0"),
+        enableAutoSkip: localStorage.getItem("rated_song_autoskip") !== "false"
+    };
+
+    function saveConfig() {
+        localStorage.setItem("rated_song_liked_threshold", CONFIG.likedThreshold);
+        localStorage.setItem("rated_song_skip_threshold", CONFIG.skipThreshold);
+        localStorage.setItem("rated_song_autoskip", CONFIG.enableAutoSkip);
+    }
+
     // 2. Function to check and create rating playlists
     async function ensurePlaylistsExist() {
         try {
@@ -277,7 +290,7 @@
 
             // Auto-like/unlike based on rating threshold (5/10)
             try {
-                if (ratingValue >= 5) {
+                if (ratingValue >= CONFIG.likedThreshold) {
                     validLikedUris.add(trackUri);
                     await Spicetify.Platform.LibraryAPI.add({uris: [trackUri]});
                 } else {
@@ -463,7 +476,7 @@
         // 1. Collect all songs that SHOULD be liked (Rating >= 5)
         for (const [name, uri] of Object.entries(ratingPlaylists)) {
             const rating = parseFloat(name.split('/')[0]);
-            if (rating >= 5) {
+            if (rating >= CONFIG.likedThreshold) {
                 try {
                     const contents = await playlistAPI.getContents(uri);
                     contents.items.forEach(item => {
@@ -514,7 +527,7 @@
             const allowed = uris.filter(uri => validLikedUris.has(uri));
             
             if (allowed.length !== uris.length) {
-                Spicetify.showNotification("Song must be rated ≥ 5/10 to Like.");
+                Spicetify.showNotification(`Song must be rated ≥ ${CONFIG.likedThreshold}/10 to Like.`);
                 // Ensure UI reverts (remove blocked items)
                 const blocked = uris.filter(uri => !validLikedUris.has(uri));
                 Spicetify.Platform.LibraryAPI.remove({uris: blocked}).catch(()=>{});
@@ -560,9 +573,7 @@
             topbarBtnWidget.active = !!rating;
         }
 
-        const autoSkip = localStorage.getItem("rated_song_autoskip") !== "false";
-
-        if (autoSkip && rating && rating <= 1) {
+        if (CONFIG.enableAutoSkip && rating && rating <= CONFIG.skipThreshold) {
             Spicetify.showNotification(`Skipping low rated song (${rating}/10)`);
             Spicetify.Player.next();
         }
@@ -606,6 +617,50 @@
         });
     }
 
+    function openSettingsModal() {
+        const container = document.createElement("div");
+        container.className = "rated-song-modal-content";
+        container.innerHTML = `
+            <h2 style="margin: 0; color: var(--spice-text);">Settings</h2>
+            <div style="display: flex; flex-direction: column; gap: 15px; width: 100%;">
+                <label style="display: flex; justify-content: space-between; align-items: center; color: var(--spice-text);">
+                    <span>Auto-Like Threshold (≥)</span>
+                    <input type="number" id="rs-liked-threshold" min="0.5" max="10" step="0.5" value="${CONFIG.likedThreshold}" style="background: var(--spice-card); color: var(--spice-text); border: 1px solid var(--spice-button); padding: 5px; border-radius: 4px; width: 60px;">
+                </label>
+                <label style="display: flex; justify-content: space-between; align-items: center; color: var(--spice-text);">
+                    <span>Auto-Skip Threshold (≤)</span>
+                    <input type="number" id="rs-skip-threshold" min="0.5" max="10" step="0.5" value="${CONFIG.skipThreshold}" style="background: var(--spice-card); color: var(--spice-text); border: 1px solid var(--spice-button); padding: 5px; border-radius: 4px; width: 60px;">
+                </label>
+                <label style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; color: var(--spice-text);">
+                    <span>Enable Auto-Skip</span>
+                    <input type="checkbox" id="rs-autoskip-toggle" ${CONFIG.enableAutoSkip ? "checked" : ""}>
+                </label>
+            </div>
+            <button id="rs-save-btn" class="rated-song-btn" style="width: 100%; margin-top: 10px;">Save & Apply</button>
+        `;
+
+        const saveBtn = container.querySelector("#rs-save-btn");
+        saveBtn.onclick = async () => {
+            const likedInput = container.querySelector("#rs-liked-threshold");
+            const skipInput = container.querySelector("#rs-skip-threshold");
+            const autoSkipInput = container.querySelector("#rs-autoskip-toggle");
+
+            CONFIG.likedThreshold = parseFloat(likedInput.value);
+            CONFIG.skipThreshold = parseFloat(skipInput.value);
+            CONFIG.enableAutoSkip = autoSkipInput.checked;
+            
+            saveConfig();
+            Spicetify.PopupModal.hide();
+            Spicetify.showNotification("Settings saved!");
+            
+            // Re-run checks
+            await syncLikedSongs();
+            checkCurrentSong();
+        };
+
+        Spicetify.PopupModal.display({ title: "Rated Song Settings", content: container });
+    }
+
     // 3. Register Context Menu, Hotkeys, and UI
     function registerInterface() {
         new Spicetify.ContextMenu.Item(
@@ -617,6 +672,9 @@
                 return uris.length === 1 && (uris[0].includes(":track:") || uris[0].includes(":local:"));
             }
         ).register();
+
+        // Settings Menu
+        new Spicetify.Menu.Item("Rated Song Settings", false, openSettingsModal).register();
 
         // Hotkeys
         document.addEventListener("keydown", (e) => {
