@@ -85,9 +85,6 @@ If you have `install_from_github.bat`, you can simply run it to download and ins
 ---
 *Note: This extension requires the Spotify Desktop app and Spicetify CLI.*
 
-## 👨‍💻 For Developers
-
-*   **`upload_to_github.bat`**: A script to automatically commit and push changes to the repository.
 
 ## 👏 Credits
 
