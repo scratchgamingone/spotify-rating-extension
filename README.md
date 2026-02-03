@@ -86,6 +86,6 @@ If you have `install_from_github.bat`, you can simply run it to download and ins
 *Note: This extension requires the Spotify Desktop app and Spicetify CLI.*
 
 
-## 👏 Credits
+##  Credits
 
 *   Inspired by [spicetify-playlist-icons](https://github.com/brimell/spicetify-star-ratings).
